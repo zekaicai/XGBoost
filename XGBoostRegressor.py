@@ -1,6 +1,7 @@
 from XGBoostBaseTree import XGBoostBaseTree
 import numpy as np
 from Animator import Animator
+from DataBinModel import DataBinModel
 
 
 def amse(y, y_hat):
@@ -11,6 +12,7 @@ class XGBoostRegressor:
     def __init__(self, num_iters, num_bins, lr, alpha, gamma, max_depth=None, anim=False):
         self.num_iters = num_iters
         self.num_bins = num_bins
+        self.bin_model = DataBinModel(num_bins)
         self.lr = lr
         self.alpha = alpha
         self.gamma = gamma
@@ -19,6 +21,11 @@ class XGBoostRegressor:
         self.anim = anim
 
     def fit(self, x, y):
+
+        # 对 x 分箱
+        self.bin_model.fit(x)
+        x = self.bin_model.transform(x)
+
         y_hat = np.zeros(y.shape)
         residual = y - y_hat
         if self.anim:
@@ -42,6 +49,7 @@ class XGBoostRegressor:
         # return cost_arr, loss_arr
 
     def transform(self, x):
+        x = self.bin_model.transform(x)
         result = np.zeros(x.shape[0])
         for i in range(self.num_iters):
             result += self.trees[i].predict(x) * self.lr

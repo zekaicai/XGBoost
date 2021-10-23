@@ -29,14 +29,12 @@ class XGBoostBaseTreeNode:
 
 
 class XGBoostBaseTree:
-    def __init__(self, num_bins, alpha, gamma, max_depth=None):
+    def __init__(self, alpha, gamma, max_depth=None, bin_model=DataBinModel(10)):
         self.max_depth = max_depth
         self.alpha = alpha
         self.gamma = gamma
         self.root = None
-        self.data_bin = DataBinModel(num_bins)
-        # self.num_leaves = 0
-        # self.leaves_weight = []
+        self.bin_model = bin_model
 
     def _score(self, g, h):
         G = np.sum(g)
@@ -105,8 +103,8 @@ class XGBoostBaseTree:
         init_y_hat = np.zeros(y.shape)
         g = init_y_hat - y
         h = np.ones(y.shape)
-        self.data_bin.fit(x)
-        self._build_tree(self.root, self.data_bin.transform(x), g, h, 1)
+        # self.data_bin.fit(x)
+        self._build_tree(self.root, x, g, h, 1)
 
     def _predict_sample(self, x):
         curr_node = self.root
@@ -120,7 +118,7 @@ class XGBoostBaseTree:
         return curr_node.y_hat
 
     def predict(self, x):
-        x = self.data_bin.transform(x)
+        # x = self.data_bin.transform(x)
         rows = x.shape[0]
         result = []
         for row in range(rows):
