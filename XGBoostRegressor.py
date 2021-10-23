@@ -27,31 +27,27 @@ class XGBoostRegressor:
         x = self.bin_model.transform(x)
 
         y_hat = np.zeros(y.shape)
-        residual = y - y_hat
+        g = y_hat - y
+        h = np.ones(y.shape)
         if self.anim:
             animator = Animator(xlabel='tree number', xlim=[0, self.num_iters], ylim=[0, 1],
                                 legend=['amse'])
-        # cost_arr = []
-        # loss_arr = []
-        # TODO：xgboost 不是直接拟合残差的，是传入当前的 g 和 h 给下一棵树去拟合
+
+        # 依次训练每棵树
         for i in range(self.num_iters):
-            curr_tree = XGBoostBaseTree(self.num_bins, self.alpha, self.gamma, self.max_depth)
-            curr_tree.fit(x, residual)
+            curr_tree = XGBoostBaseTree(self.alpha, self.gamma, self.max_depth)
+            curr_tree.fit(x, g, h)
             self.trees.append(curr_tree)
             curr_predict = curr_tree.predict(x)
             y_hat += self.lr * curr_predict
-            residual = y - y_hat
             if self.anim:
                 animator.add(i, amse(y, y_hat))
-            # cost, loss = self.curr_loss(x, y)
-            # cost_arr.append(cost)
-            # loss_arr.append(loss)
-        # return cost_arr, loss_arr
+            g = y_hat - y
 
     def transform(self, x):
         x = self.bin_model.transform(x)
         result = np.zeros(x.shape[0])
-        for i in range(self.num_iters):
+        for i in range(len(self.trees)):
             result += self.trees[i].predict(x) * self.lr
         return result
 

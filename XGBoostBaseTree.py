@@ -98,11 +98,11 @@ class XGBoostBaseTree:
         curr_node.right_child = XGBoostBaseTreeNode()
         self._build_tree(curr_node.right_child, x[right_indices], g[right_indices], h[right_indices], curr_depth+1)
 
-    def fit(self, x, y):
+    def fit(self, x, g, h):
         self.root = XGBoostBaseTreeNode()
-        init_y_hat = np.zeros(y.shape)
-        g = init_y_hat - y
-        h = np.ones(y.shape)
+        # init_y_hat = np.zeros(y.shape)
+        # g = init_y_hat - y
+        # h = np.ones(y.shape)
         # self.data_bin.fit(x)
         self._build_tree(self.root, x, g, h, 1)
 
