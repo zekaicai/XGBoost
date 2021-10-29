@@ -4,12 +4,37 @@ from Animator import Animator
 from DataBinModel import DataBinModel
 
 
-def amse(y, y_hat):
-    return np.sum((y-y_hat)**2) / len(y)
+def sigmoid(x):
+    return 1 / (1 + np.exp(-x))
 
 
-class XGBoostRegressor:
-    def __init__(self, num_iters, num_bins, lr, alpha, gamma, max_depth=None, anim=False, anim_y_lim=100):
+def to_type(x):
+    # x = self.data_bin.transform(x)
+    rows = x.shape[0]
+    result = []
+    for row in range(rows):
+        sample = x[row]
+        result.append(1 if sample > 0.5 else 0)
+    return np.asarray(result)
+
+
+def accuracy(y_hat, y):
+    total = len(y_hat)
+    correct = 0
+    for row in range(total):
+        if y_hat[row] == y[row]:
+            correct += 1
+    print('total: ' + str(total))
+    print('correct: ' + str(correct))
+    return correct / total
+
+
+def logit(x):
+    return np.log(x / (1 - x))
+
+
+class XGBoostClassifier:
+    def __init__(self, num_iters, num_bins, lr, alpha, gamma, max_depth=None, anim=False):
         self.num_iters = num_iters
         self.bin_model = DataBinModel(num_bins)
         self.lr = lr
@@ -18,8 +43,6 @@ class XGBoostRegressor:
         self.max_depth = max_depth
         self.trees = []
         self.anim = anim
-        self.anim_y_lim = anim_y_lim
-        self.loss_list = []
 
     def fit(self, x, y):
 
@@ -27,12 +50,14 @@ class XGBoostRegressor:
         self.bin_model.fit(x)
         x = self.bin_model.transform(x)
 
-        y_hat = np.zeros(y.shape)
-        g = y_hat - y
-        h = np.ones(y.shape)
+        # 初始的预测值为 0.5
+        p_hat = np.full(y.shape, 0.5)
+        g = p_hat - y
+        h = p_hat * (1 - p_hat)
+        y_hat = logit(p_hat)
         if self.anim:
-            animator = Animator(xlabel='tree number', xlim=[0, self.num_iters], ylim=[0, self.anim_y_lim],
-                                legend=['loss'])
+            animator = Animator(xlabel='tree number', xlim=[0, self.num_iters], ylim=[0, 1],
+                                legend=['amse'])
 
         # 依次训练每棵树
         for i in range(self.num_iters):
@@ -44,21 +69,23 @@ class XGBoostRegressor:
                 y_hat += curr_predict
             else:
                 y_hat += self.lr * curr_predict
-            loss = amse(y, y_hat) + curr_tree.penalty()
-            self.loss_list.append(loss)
             if self.anim:
-                animator.add(i, loss)
-            g = y_hat - y
+                animator.add(i, amse(y, p_hat))
+            p_hat = sigmoid(y_hat)
+            g = p_hat - y
+            h - p_hat * (1 - p_hat)
 
     def transform(self, x):
         x = self.bin_model.transform(x)
-        result = np.zeros(x.shape[0])
+        logodds = np.zeros(x.shape[0])
         for i in range(len(self.trees)):
             if i == 0 or i == len(self.trees) - 1:  # 学习率对结果的衰减不作用于第一棵树和最后一棵树
-                result += self.trees[i].predict(x)
+                logodds += self.trees[i].predict(x)
             else:
-                result += self.trees[i].predict(x) * self.lr
-        return result
+                logodds += self.trees[i].predict(x) * self.lr
+        # return to_type(sigmoid(logodds))
+        return sigmoid(logodds)
+        metrics.roc_auc_score
 
     def curr_loss(self, x, y):
         y_hat = np.zeros(x.shape[0])
@@ -74,10 +101,12 @@ class XGBoostRegressor:
 
 if __name__ == '__main__':
     import sklearn.datasets
-    dataset = sklearn.datasets.load_boston()
+    from sklearn import metrics
+
+    dataset = sklearn.datasets.load_breast_cancer()
     data, target = dataset['data'], dataset['target']
-    model = XGBoostRegressor(num_iters=50, num_bins=10, lr=0.1, alpha=0.01, gamma=0.01, max_depth=7)
+    model = XGBoostClassifier(num_iters=3, num_bins=10, lr=0.01, alpha=0.01, gamma=0.01, max_depth=5)
     model.fit(data, target)
     result = model.transform(data)
-    print(amse(result, target))
-    print(model.curr_loss(data, target))
+    print(accuracy(result, target))
+    print('auc: ' + str(metrics.roc_auc_score(result, target)))
